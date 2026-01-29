@@ -41,13 +41,75 @@ export function ParagraphBlock({
         }
     }, [isActive]);
 
+    // Convert inline Markdown patterns to HTML
+    const convertInlineMarkdown = useCallback((html) => {
+        let converted = html;
+        let changed = false;
+
+        // **bold** -> <strong>bold</strong>
+        const boldPattern = /\*\*([^*]+)\*\*/g;
+        if (boldPattern.test(converted)) {
+            converted = converted.replace(boldPattern, "<strong>$1</strong>");
+            changed = true;
+        }
+
+        // *italic* -> <em>italic</em> (but not if part of **)
+        const italicPattern = /(?<!\*)\*([^*]+)\*(?!\*)/g;
+        if (italicPattern.test(converted)) {
+            converted = converted.replace(italicPattern, "<em>$1</em>");
+            changed = true;
+        }
+
+        // ~~strikethrough~~ -> <s>strikethrough</s>
+        const strikePattern = /~~([^~]+)~~/g;
+        if (strikePattern.test(converted)) {
+            converted = converted.replace(strikePattern, "<s>$1</s>");
+            changed = true;
+        }
+
+        // `code` -> <code>code</code>
+        const codePattern = /`([^`]+)`/g;
+        if (codePattern.test(converted)) {
+            converted = converted.replace(
+                codePattern,
+                '<code class="bg-gray-100 px-1 rounded text-sm font-mono">$1</code>'
+            );
+            changed = true;
+        }
+
+        return { converted, changed };
+    }, []);
+
     // Handle input changes - sync to store without re-rendering
     const handleInput = useCallback(
         (e) => {
-            const newContent = e.currentTarget.innerHTML || "";
+            const el = e.currentTarget;
+            let newContent = el.innerHTML || "";
+
+            // Try to convert inline Markdown
+            const { converted, changed } = convertInlineMarkdown(newContent);
+
+            if (changed) {
+                // Update content with converted HTML
+                const selection = window.getSelection();
+                el.innerHTML = converted;
+                newContent = converted;
+
+                // Move cursor to end of converted element
+                try {
+                    const newRange = document.createRange();
+                    newRange.selectNodeContents(el);
+                    newRange.collapse(false);
+                    selection?.removeAllRanges();
+                    selection?.addRange(newRange);
+                } catch {
+                    // Ignore cursor positioning errors
+                }
+            }
+
             onContentChange(id, newContent);
         },
-        [id, onContentChange]
+        [id, onContentChange, convertInlineMarkdown]
     );
 
     // Handle key events

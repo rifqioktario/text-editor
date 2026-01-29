@@ -18,6 +18,7 @@ import { SlashMenu } from "./SlashMenu";
 import { cn } from "../../utils/cn";
 import { BLOCK_TYPES } from "../../constants/BLOCK_TYPES";
 import { parseMarkdown } from "../../services/markdownParser";
+import { serializeBlocks } from "../../services/markdownSerializer";
 
 /**
  * EditorCanvas - Main editing area that renders all blocks
@@ -33,6 +34,7 @@ export function EditorCanvas() {
         mergeWithPreviousBlock,
         convertBlockType,
         moveBlock,
+        addBlockAfter,
         indentBlock,
         outdentBlock,
         insertBlocksAtPosition,
@@ -77,17 +79,116 @@ export function EditorCanvas() {
                 return;
             }
 
-            // Ctrl+A = Progressive selection
-            if (modKey && e.key === "a") {
+            // Check if we're inside the editor canvas
+            const isInEditor = e.target.closest("[data-editor-canvas]");
+
+            // Ctrl+A = Progressive selection (only inside editor)
+            // 1st tap: select text in block (browser default)
+            // 2nd tap: select whole block
+            // 3rd tap: select all blocks
+            if (modKey && e.key === "a" && isInEditor) {
+                const selection = window.getSelection();
+                const hasTextSelection = selection && !selection.isCollapsed;
+                const isAllTextSelected =
+                    hasTextSelection &&
+                    selection.toString().length >=
+                        (e.target.textContent?.length || 0);
+
+                // If no selection or partial selection, let browser handle it (select all text in block)
+                if (!hasTextSelection || !isAllTextSelected) {
+                    // Let default browser behavior select text
+                    return;
+                }
+
+                // If all text is selected, cycle to block/all selection
                 e.preventDefault();
                 cycleSelection();
+                return;
+            }
+
+            // Ctrl+B = Bold (only when text is selected in editor)
+            if (modKey && e.key === "b" && isInEditor) {
+                // Don't prevent default - let browser handle bold on selection
+                return;
+            }
+
+            // Ctrl+I = Italic (only when text is selected in editor)
+            if (modKey && e.key === "i" && isInEditor) {
+                // Don't prevent default - let browser handle italic on selection
+                return;
+            }
+
+            // Ctrl+K = Insert Link
+            if (modKey && e.key === "k") {
+                e.preventDefault();
+                const selection = window.getSelection();
+                const selectedText = selection?.toString() || "";
+                const url = prompt("Enter URL:", "https://");
+                if (url && url !== "https://") {
+                    document.execCommand(
+                        "insertHTML",
+                        false,
+                        `<a href="${url}" target="_blank" rel="noopener">${selectedText || url}</a>`
+                    );
+                }
+                return;
+            }
+
+            // Ctrl+S = Visual save feedback (auto-save already happens)
+            if (modKey && e.key === "s") {
+                e.preventDefault();
+                // Already auto-saving, just show feedback via toast
+                return;
+            }
+
+            // Ctrl+D = Duplicate block
+            if (modKey && e.key === "d" && activeBlockId) {
+                e.preventDefault();
+                const activeBlock = blocks.find((b) => b.id === activeBlockId);
+                if (activeBlock) {
+                    const duplicatedBlock = {
+                        ...activeBlock,
+                        id: crypto.randomUUID(),
+                        properties: { ...activeBlock.properties }
+                    };
+                    addBlockAfter(activeBlockId, duplicatedBlock);
+                }
+                return;
+            }
+
+            // Ctrl+Shift+Up = Move block up
+            if (modKey && e.shiftKey && e.key === "ArrowUp" && activeBlockId) {
+                e.preventDefault();
+                const currentIndex = blocks.findIndex(
+                    (b) => b.id === activeBlockId
+                );
+                if (currentIndex > 0) {
+                    moveBlock(activeBlockId, currentIndex - 1);
+                }
+                return;
+            }
+
+            // Ctrl+Shift+Down = Move block down
+            if (
+                modKey &&
+                e.shiftKey &&
+                e.key === "ArrowDown" &&
+                activeBlockId
+            ) {
+                e.preventDefault();
+                const currentIndex = blocks.findIndex(
+                    (b) => b.id === activeBlockId
+                );
+                if (currentIndex < blocks.length - 1) {
+                    moveBlock(activeBlockId, currentIndex + 1);
+                }
                 return;
             }
 
             // Delete/Backspace when blocks are selected
             if (
                 (e.key === "Delete" || e.key === "Backspace") &&
-                selectionLevel >= 2
+                selectionLevel >= 1
             ) {
                 e.preventDefault();
                 deleteSelectedBlocks();
@@ -97,6 +198,39 @@ export function EditorCanvas() {
             // Escape clears selection
             if (e.key === "Escape" && selectionLevel > 0) {
                 clearSelection();
+                return;
+            }
+
+            // Ctrl+C = Copy selected blocks
+            if (
+                modKey &&
+                e.key === "c" &&
+                selectionLevel >= 1 &&
+                selectedBlockIds.length > 0
+            ) {
+                e.preventDefault();
+                const selectedBlocks = blocks.filter((b) =>
+                    selectedBlockIds.includes(b.id)
+                );
+                const markdown = serializeBlocks(selectedBlocks);
+                navigator.clipboard.writeText(markdown);
+                return;
+            }
+
+            // Ctrl+X = Cut selected blocks
+            if (
+                modKey &&
+                e.key === "x" &&
+                selectionLevel >= 1 &&
+                selectedBlockIds.length > 0
+            ) {
+                e.preventDefault();
+                const selectedBlocks = blocks.filter((b) =>
+                    selectedBlockIds.includes(b.id)
+                );
+                const markdown = serializeBlocks(selectedBlocks);
+                navigator.clipboard.writeText(markdown);
+                deleteSelectedBlocks();
                 return;
             }
         };
@@ -109,7 +243,12 @@ export function EditorCanvas() {
         cycleSelection,
         clearSelection,
         deleteSelectedBlocks,
-        selectionLevel
+        selectionLevel,
+        selectedBlockIds,
+        activeBlockId,
+        blocks,
+        addBlockAfter,
+        moveBlock
     ]);
 
     /**
@@ -357,23 +496,75 @@ export function EditorCanvas() {
                 }
             }
 
-            // Arrow Up - Move to previous block
-            if (e.key === "ArrowUp") {
+            // Arrow Up - Move to previous block when at start
+            if (e.key === "ArrowUp" && !e.shiftKey) {
                 const blockIndex = blocks.findIndex((b) => b.id === blockId);
 
-                if (blockIndex > 0) {
+                // Check if cursor is at the very start
+                const selection = window.getSelection();
+                const range = selection?.getRangeAt(0);
+                const isAtStart =
+                    range?.startOffset === 0 &&
+                    (range?.startContainer === e.currentTarget ||
+                        range?.startContainer === e.currentTarget.firstChild ||
+                        (selection?.anchorNode?.previousSibling === null &&
+                            range?.startOffset === 0));
+
+                if (blockIndex > 0 && isAtStart) {
+                    e.preventDefault();
                     const prevBlock = blocks[blockIndex - 1];
                     setActiveBlock(prevBlock.id);
+                    // Focus at end of previous block
+                    setTimeout(() => {
+                        const prevEl = window.document.querySelector(
+                            `[data-block-id="${prevBlock.id}"] [contenteditable]`
+                        );
+                        if (prevEl) {
+                            prevEl.focus();
+                            const range = window.document.createRange();
+                            range.selectNodeContents(prevEl);
+                            range.collapse(false); // false = end
+                            const sel = window.getSelection();
+                            sel?.removeAllRanges();
+                            sel?.addRange(range);
+                        }
+                    }, 0);
                 }
             }
 
-            // Arrow Down - Move to next block
-            if (e.key === "ArrowDown") {
+            // Arrow Down - Move to next block when at end
+            if (e.key === "ArrowDown" && !e.shiftKey) {
                 const blockIndex = blocks.findIndex((b) => b.id === blockId);
 
-                if (blockIndex < blocks.length - 1) {
+                // Check if cursor is at the very end
+                const selection = window.getSelection();
+                const range = selection?.getRangeAt(0);
+                const target = e.currentTarget;
+                const isAtEnd =
+                    range?.endOffset ===
+                        (range?.endContainer?.textContent?.length || 0) &&
+                    (range?.endContainer === target ||
+                        range?.endContainer?.nextSibling === null);
+
+                if (blockIndex < blocks.length - 1 && isAtEnd) {
+                    e.preventDefault();
                     const nextBlock = blocks[blockIndex + 1];
                     setActiveBlock(nextBlock.id);
+                    // Focus at start of next block
+                    setTimeout(() => {
+                        const nextEl = window.document.querySelector(
+                            `[data-block-id="${nextBlock.id}"] [contenteditable]`
+                        );
+                        if (nextEl) {
+                            nextEl.focus();
+                            const range = window.document.createRange();
+                            range.selectNodeContents(nextEl);
+                            range.collapse(true); // true = start
+                            const sel = window.getSelection();
+                            sel?.removeAllRanges();
+                            sel?.addRange(range);
+                        }
+                    }, 0);
                 }
             }
         },
@@ -442,6 +633,7 @@ export function EditorCanvas() {
             onDragEnd={handleDragEnd}
         >
             <div
+                data-editor-canvas
                 className={cn(
                     "w-full max-w-3xl mx-auto",
                     "min-h-[calc(100vh-8rem)]",

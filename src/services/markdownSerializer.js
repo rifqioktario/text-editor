@@ -143,6 +143,19 @@ export function serializeDocument(document) {
 }
 
 /**
+ * Serialize specific blocks to Markdown
+ * @param {Array} blocks - Array of block objects
+ * @returns {string} Markdown string
+ */
+export function serializeBlocks(blocks) {
+    if (!blocks || !blocks.length) return "";
+    return blocks
+        .map((block) => serializeBlock(block))
+        .join("")
+        .trim();
+}
+
+/**
  * Convert document to plain text (no formatting)
  * @param {Object} document - Document object
  * @returns {string} Plain text string

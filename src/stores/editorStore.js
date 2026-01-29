@@ -118,6 +118,9 @@ export const useEditorStore = create(
 
         /**
          * Cycle selection level (for Ctrl+A)
+         * Level 0: No selection
+         * Level 1: Current block selected
+         * Level 2: All blocks selected
          */
         cycleSelection: () => {
             set((state) => {
@@ -125,21 +128,18 @@ export const useEditorStore = create(
                 const blocks = state.document.blocks;
 
                 if (currentLevel === 0) {
-                    // Level 1: Select content in current block (browser handles this)
+                    // Level 1: Select current block
                     state.selectionLevel = 1;
-                } else if (currentLevel === 1) {
-                    // Level 2: Select current block
-                    state.selectionLevel = 2;
                     if (state.activeBlockId) {
                         state.selectedBlockIds = [state.activeBlockId];
                     }
-                } else if (currentLevel === 2) {
-                    // Level 3: Select all blocks
-                    state.selectionLevel = 3;
+                } else if (currentLevel === 1) {
+                    // Level 2: Select all blocks
+                    state.selectionLevel = 2;
                     state.selectedBlockIds = blocks.map((b) => b.id);
                 } else {
-                    // Reset to level 1
-                    state.selectionLevel = 1;
+                    // Reset to level 0
+                    state.selectionLevel = 0;
                     state.selectedBlockIds = [];
                 }
             });

@@ -1,8 +1,9 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { Editor } from "./components/Editor/Editor";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { TopBar } from "./components/TopBar/TopBar";
 import { ToastContainer } from "./components/Toast/Toast";
+import { Dialog } from "./components/Dialog/Dialog";
 import { useDocumentsStore } from "./stores/documentsStore";
 import { useEditorStore } from "./stores/editorStore";
 import { useToastStore } from "./stores/toastStore";
@@ -37,6 +38,13 @@ function App() {
 
     // Get active document data
     const activeDocument = documents.find((d) => d.id === activeDocumentId);
+
+    // Delete dialog state
+    const [deleteDialog, setDeleteDialog] = useState({
+        isOpen: false,
+        docId: null,
+        docTitle: ""
+    });
 
     // Initialize: load documents from IndexedDB
     useEffect(() => {
@@ -77,36 +85,42 @@ function App() {
         [activeDocumentId, renameDocument]
     );
 
-    // Handle rename from Sidebar (with prompt)
+    // Handle rename from Sidebar (inline edit)
     const handleRenameFromSidebar = useCallback(
-        (docId) => {
-            const doc = documents.find((d) => d.id === docId);
-            const newTitle = prompt(
-                "Rename document:",
-                doc?.title || "Untitled"
-            );
+        (docId, newTitle) => {
             if (newTitle && newTitle.trim()) {
                 renameDocument(docId, newTitle.trim());
             }
         },
-        [documents, renameDocument]
+        [renameDocument]
     );
 
-    // Handle delete with confirmation
-    const handleDelete = useCallback(
+    // Handle delete - show confirmation dialog
+    const handleDeleteRequest = useCallback(
         (docId) => {
             const targetId = docId || activeDocumentId;
             const doc = documents.find((d) => d.id === targetId);
-            if (
-                confirm(
-                    `Delete "${doc?.title || "Untitled"}"? This cannot be undone.`
-                )
-            ) {
-                deleteDocument(targetId);
-            }
+            setDeleteDialog({
+                isOpen: true,
+                docId: targetId,
+                docTitle: doc?.title || "Untitled"
+            });
         },
-        [documents, activeDocumentId, deleteDocument]
+        [documents, activeDocumentId]
     );
+
+    // Confirm delete
+    const handleDeleteConfirm = useCallback(() => {
+        if (deleteDialog.docId) {
+            deleteDocument(deleteDialog.docId);
+        }
+        setDeleteDialog({ isOpen: false, docId: null, docTitle: "" });
+    }, [deleteDialog.docId, deleteDocument]);
+
+    // Cancel delete
+    const handleDeleteCancel = useCallback(() => {
+        setDeleteDialog({ isOpen: false, docId: null, docTitle: "" });
+    }, []);
 
     // Handle duplicate
     const handleDuplicate = useCallback(
@@ -170,7 +184,7 @@ function App() {
                 onToggleCollapse={toggleSidebar}
                 onSelectDocument={selectDocument}
                 onCreateDocument={createDocument}
-                onDeleteDocument={handleDelete}
+                onDeleteDocument={handleDeleteRequest}
                 onDuplicateDocument={handleDuplicate}
                 onRenameDocument={handleRenameFromSidebar}
                 isSaving={isSaving}
@@ -188,7 +202,7 @@ function App() {
                     onToggleSidebar={toggleSidebar}
                     onRename={handleRenameFromTopBar}
                     onNewDocument={createDocument}
-                    onDelete={() => handleDelete(activeDocumentId)}
+                    onDelete={() => handleDeleteRequest(activeDocumentId)}
                     onDuplicate={() => handleDuplicate(activeDocumentId)}
                     onExportDownload={handleExportDownload}
                     onExportCopyMarkdown={handleExportCopyMarkdown}
@@ -225,6 +239,18 @@ function App() {
                     )}
                 </main>
             </div>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog
+                isOpen={deleteDialog.isOpen}
+                onClose={handleDeleteCancel}
+                onConfirm={handleDeleteConfirm}
+                title="Delete Document"
+                message={`Are you sure you want to delete "${deleteDialog.docTitle}"? This action cannot be undone.`}
+                confirmText="Delete"
+                cancelText="Cancel"
+                danger={true}
+            />
 
             {/* Toast Container */}
             <ToastContainer />

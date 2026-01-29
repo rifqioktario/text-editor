@@ -6,6 +6,7 @@ import { cn } from "../../utils/cn";
 
 /**
  * SortableBlock - Wrapper that makes a block draggable with @dnd-kit
+ * Uses Notion-style drop indicator line instead of surrounding border
  */
 export function SortableBlock({
     block,
@@ -24,7 +25,9 @@ export function SortableBlock({
         setNodeRef,
         transform,
         transition,
-        isDragging
+        isDragging,
+        isOver,
+        active
     } = useSortable({ id: block.id });
 
     const style = {
@@ -32,16 +35,43 @@ export function SortableBlock({
         transition
     };
 
+    // Determine if drop indicator should show above or below
+    // If dragging item is after this block, show indicator above
+    const showDropIndicator = isOver && !isDragging && active?.id !== block.id;
+
     return (
         <div
             ref={setNodeRef}
             style={style}
-            className={cn(
-                "relative group",
-                isDragging && "z-50 opacity-50",
-                isSelected && "ring-2 ring-blue-500 rounded-lg bg-blue-50/30"
-            )}
+            data-block-id={block.id}
+            className={cn("relative group", isDragging && "z-50 opacity-30")}
         >
+            {/* Notion-style drop indicator line - shows above block */}
+            {showDropIndicator && (
+                <div
+                    className="absolute left-0 right-0 h-0.5 bg-blue-500 rounded-full z-50"
+                    style={{
+                        top: "-2px",
+                        left: "-8px",
+                        right: "-8px"
+                    }}
+                />
+            )}
+
+            {/* Selection highlight - Notion style */}
+            {isSelected && (
+                <div
+                    className="absolute inset-0 bg-blue-100/60 rounded-sm pointer-events-none"
+                    style={{
+                        left: "-8px",
+                        right: "-8px",
+                        top: "-2px",
+                        bottom: "-2px",
+                        borderRadius: "3px"
+                    }}
+                />
+            )}
+
             {/* Drag Handle */}
             <BlockHandle
                 listeners={listeners}
@@ -49,13 +79,8 @@ export function SortableBlock({
                 isDragging={isDragging}
             />
 
-            {/* Block Content */}
-            <div
-                className={cn(
-                    isDragging &&
-                        "shadow-xl ring-2 ring-blue-500/30 rounded-lg bg-white"
-                )}
-            >
+            {/* Block Content - no ring styling when dragging */}
+            <div className="relative">
                 <Block
                     block={block}
                     isActive={isActive}
