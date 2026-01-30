@@ -8,7 +8,8 @@ import {
 } from "../utils/blocks";
 import {
     BLOCK_TYPES,
-    DEFAULT_BLOCK_PROPERTIES
+    DEFAULT_BLOCK_PROPERTIES,
+    createBlockProperties
 } from "../constants/BLOCK_TYPES";
 
 /**
@@ -125,7 +126,12 @@ export const useEditorStore = create(
         cycleSelection: () => {
             set((state) => {
                 const currentLevel = state.selectionLevel;
-                const blocks = state.document.blocks;
+                // Only select top-level blocks (not nested blocks inside columns/tabs)
+                const topLevelBlocks = state.document.blocks.filter(
+                    (b) =>
+                        b.columnIndex === undefined &&
+                        b.parentTabId === undefined
+                );
 
                 if (currentLevel === 0) {
                     // Level 1: Select current block
@@ -134,9 +140,9 @@ export const useEditorStore = create(
                         state.selectedBlockIds = [state.activeBlockId];
                     }
                 } else if (currentLevel === 1) {
-                    // Level 2: Select all blocks
+                    // Level 2: Select all top-level blocks
                     state.selectionLevel = 2;
-                    state.selectedBlockIds = blocks.map((b) => b.id);
+                    state.selectedBlockIds = topLevelBlocks.map((b) => b.id);
                 } else {
                     // Reset to level 0
                     state.selectionLevel = 0;
@@ -255,6 +261,30 @@ export const useEditorStore = create(
         },
 
         /**
+         * Update a block fully (properties, children, etc.)
+         * Used for container blocks like Tabs and Columns
+         */
+        updateBlockFull: (blockId, updates) => {
+            set((state) => {
+                const block = state.document.blocks.find(
+                    (b) => b.id === blockId
+                );
+                if (block) {
+                    if (updates.properties) {
+                        block.properties = {
+                            ...block.properties,
+                            ...updates.properties
+                        };
+                    }
+                    if (updates.children !== undefined) {
+                        block.children = updates.children;
+                    }
+                    state.document.updatedAt = new Date().toISOString();
+                }
+            });
+        },
+
+        /**
          * Update a block's type
          */
         updateBlockType: (blockId, newType) => {
@@ -352,7 +382,17 @@ export const useEditorStore = create(
 
                 if (block) {
                     block.type = newType;
-                    block.properties = { ...DEFAULT_BLOCK_PROPERTIES[newType] };
+                    // Use factory function for types that need generated IDs
+                    if (
+                        newType === BLOCK_TYPES.TABS ||
+                        newType === BLOCK_TYPES.COLUMNS
+                    ) {
+                        block.properties = createBlockProperties(newType);
+                    } else {
+                        block.properties = {
+                            ...DEFAULT_BLOCK_PROPERTIES[newType]
+                        };
+                    }
                     if (newContent !== null) {
                         block.content = newContent;
                     }
@@ -441,6 +481,105 @@ export const useEditorStore = create(
                         };
                         state.document.updatedAt = new Date().toISOString();
                     }
+                }
+            });
+        },
+
+        // ========== Nested Block Actions ==========
+
+        /**
+         * Add a block to a column in a Columns block
+         */
+        addBlockToColumn: (columnsBlockId, columnIndex, newBlockData) => {
+            get().saveToHistory();
+            set((state) => {
+                const block = state.document.blocks.find(
+                    (b) => b.id === columnsBlockId
+                );
+                if (!block || block.type !== BLOCK_TYPES.COLUMNS) return;
+
+                // Initialize children array if needed
+                if (!block.children) {
+                    block.children = [];
+                }
+
+                // Create new block
+                const newBlock = {
+                    id: crypto.randomUUID(),
+                    type: newBlockData.type || BLOCK_TYPES.PARAGRAPH,
+                    content: newBlockData.content || "",
+                    properties: newBlockData.properties || {},
+                    columnIndex
+                };
+
+                // Find or create column entry
+                let column = block.children.find(
+                    (c) => c.columnIndex === columnIndex
+                );
+                if (!column) {
+                    column = { columnIndex, blocks: [] };
+                    block.children.push(column);
+                }
+
+                column.blocks.push(newBlock.id);
+
+                // Store the actual block in document
+                state.document.blocks.push(newBlock);
+                state.activeBlockId = newBlock.id;
+                state.document.updatedAt = new Date().toISOString();
+            });
+        },
+
+        /**
+         * Add a block to a tab in a Tabs block
+         */
+        addBlockToTab: (tabsBlockId, tabId, newBlockData) => {
+            get().saveToHistory();
+            set((state) => {
+                const block = state.document.blocks.find(
+                    (b) => b.id === tabsBlockId
+                );
+                if (!block || block.type !== BLOCK_TYPES.TABS) return;
+
+                // Initialize children object if needed
+                if (!block.children) {
+                    block.children = {};
+                }
+
+                // Create new block
+                const newBlock = {
+                    id: crypto.randomUUID(),
+                    type: newBlockData.type || BLOCK_TYPES.PARAGRAPH,
+                    content: newBlockData.content || "",
+                    properties: newBlockData.properties || {},
+                    parentTabId: tabId
+                };
+
+                // Initialize tab blocks array if needed
+                if (!block.children[tabId]) {
+                    block.children[tabId] = [];
+                }
+
+                block.children[tabId].push(newBlock.id);
+
+                // Store the actual block in document
+                state.document.blocks.push(newBlock);
+                state.activeBlockId = newBlock.id;
+                state.document.updatedAt = new Date().toISOString();
+            });
+        },
+
+        /**
+         * Update a block inside a container (Column/Tab)
+         */
+        updateNestedBlock: (blockId, updates) => {
+            set((state) => {
+                const block = state.document.blocks.find(
+                    (b) => b.id === blockId
+                );
+                if (block) {
+                    Object.assign(block, updates);
+                    state.document.updatedAt = new Date().toISOString();
                 }
             });
         },

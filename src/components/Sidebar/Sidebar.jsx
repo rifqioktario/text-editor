@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useDrag } from "@use-gesture/react";
 import {
     ChevronLeft,
     Plus,
@@ -8,9 +9,11 @@ import {
     MoreHorizontal,
     Trash2,
     Copy,
-    PenLine
+    PenLine,
+    X
 } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { useMobile } from "../../hooks/useMobile";
 
 /**
  * Sidebar - Notion-inspired document navigation
@@ -30,6 +33,7 @@ export function Sidebar({
 }) {
     const [searchQuery, setSearchQuery] = useState("");
     const [menuOpenId, setMenuOpenId] = useState(null);
+    const { isMobile } = useMobile();
 
     // Filter documents
     const filteredDocuments = documents.filter((doc) =>
@@ -57,6 +61,240 @@ export function Sidebar({
         return `${Math.floor(diff / 3600000)}h ago`;
     }, [lastSaved]);
 
+    // Swipe gesture to close sidebar on mobile
+    const bindDrag = useDrag(
+        ({ movement: [mx], velocity: [vx], direction: [dx], cancel }) => {
+            // Swipe left to close
+            if (isMobile && !isCollapsed && dx < 0 && (mx < -100 || vx > 0.5)) {
+                onToggleCollapse?.();
+                cancel();
+            }
+        },
+        { axis: "x", filterTaps: true }
+    );
+
+    // Mobile: Full-screen drawer with backdrop
+    if (isMobile) {
+        return (
+            <AnimatePresence>
+                {!isCollapsed && (
+                    <>
+                        {/* Backdrop */}
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            onClick={onToggleCollapse}
+                            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+                        />
+
+                        {/* Drawer */}
+                        <motion.aside
+                            {...bindDrag()}
+                            initial={{ x: "-100%" }}
+                            animate={{ x: 0 }}
+                            exit={{ x: "-100%" }}
+                            transition={{
+                                type: "spring",
+                                stiffness: 400,
+                                damping: 35
+                            }}
+                            className={cn(
+                                "fixed inset-y-0 left-0 z-50",
+                                "w-[85vw] max-w-[320px]",
+                                "bg-[#fbfbfa]",
+                                "flex flex-col",
+                                "shadow-2xl",
+                                "touch-pan-y"
+                            )}
+                            style={{
+                                paddingTop: "env(safe-area-inset-top, 0px)"
+                            }}
+                        >
+                            {/* Mobile Header with Close Button */}
+                            <div className="flex items-center justify-between px-4 pt-4 pb-2">
+                                <span className="text-xs font-semibold text-[#37352f] uppercase tracking-wider">
+                                    Documents
+                                </span>
+
+                                <div className="flex items-center gap-2">
+                                    {/* New Document */}
+                                    <button
+                                        onClick={onCreateDocument}
+                                        className={cn(
+                                            "w-10 h-10 rounded-xl",
+                                            "flex items-center justify-center",
+                                            "text-[#91918e] active:text-[#37352f]",
+                                            "active:bg-[#ebebea]",
+                                            "transition-colors duration-100"
+                                        )}
+                                        title="New page"
+                                    >
+                                        <Plus
+                                            className="w-5 h-5"
+                                            strokeWidth={2}
+                                        />
+                                    </button>
+
+                                    {/* Close */}
+                                    <button
+                                        onClick={onToggleCollapse}
+                                        className={cn(
+                                            "w-10 h-10 rounded-xl",
+                                            "flex items-center justify-center",
+                                            "text-[#91918e] active:text-[#37352f]",
+                                            "active:bg-[#ebebea]",
+                                            "transition-colors duration-100"
+                                        )}
+                                    >
+                                        <X
+                                            className="w-5 h-5"
+                                            strokeWidth={2}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Search - larger for mobile */}
+                            <div className="px-3 pb-3">
+                                <div
+                                    className={cn(
+                                        "relative flex items-center",
+                                        "bg-[#f1f1ef] rounded-xl",
+                                        "focus-within:bg-[#e8e8e6]",
+                                        "transition-colors duration-100"
+                                    )}
+                                >
+                                    <Search
+                                        className="absolute left-3 w-4 h-4 text-[#91918e]"
+                                        strokeWidth={2}
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Search"
+                                        value={searchQuery}
+                                        onChange={(e) =>
+                                            setSearchQuery(e.target.value)
+                                        }
+                                        className={cn(
+                                            "w-full pl-10 pr-3 py-3",
+                                            "bg-transparent",
+                                            "text-base text-[#37352f] placeholder-[#91918e]",
+                                            "focus:outline-none"
+                                        )}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Document List - larger touch targets */}
+                            <div className="flex-1 overflow-y-auto px-2 py-1">
+                                <AnimatePresence mode="popLayout">
+                                    {filteredDocuments.map((doc, index) => (
+                                        <motion.div
+                                            key={doc.id}
+                                            layout
+                                            initial={{ opacity: 0, y: -4 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, scale: 0.98 }}
+                                            transition={{
+                                                type: "spring",
+                                                stiffness: 500,
+                                                damping: 30,
+                                                delay: index * 0.02
+                                            }}
+                                        >
+                                            <DocumentItem
+                                                doc={doc}
+                                                isActive={
+                                                    doc.id === activeDocumentId
+                                                }
+                                                isMenuOpen={
+                                                    menuOpenId === doc.id
+                                                }
+                                                isMobile={true}
+                                                onSelect={() => {
+                                                    onSelectDocument(doc.id);
+                                                    onToggleCollapse?.();
+                                                }}
+                                                onMenuToggle={() =>
+                                                    setMenuOpenId(
+                                                        menuOpenId === doc.id
+                                                            ? null
+                                                            : doc.id
+                                                    )
+                                                }
+                                                onDelete={() => {
+                                                    onDeleteDocument(doc.id);
+                                                    setMenuOpenId(null);
+                                                }}
+                                                onDuplicate={() => {
+                                                    onDuplicateDocument(doc.id);
+                                                    setMenuOpenId(null);
+                                                }}
+                                                onRename={(newTitle) => {
+                                                    onRenameDocument(
+                                                        doc.id,
+                                                        newTitle
+                                                    );
+                                                    setMenuOpenId(null);
+                                                }}
+                                            />
+                                        </motion.div>
+                                    ))}
+                                </AnimatePresence>
+
+                                {filteredDocuments.length === 0 && (
+                                    <div className="text-center py-8 text-[#91918e] text-sm">
+                                        {searchQuery
+                                            ? "No results"
+                                            : "No pages yet"}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Footer - Save status */}
+                            <div
+                                className="px-4 py-3 border-t border-[#e8e8e6]"
+                                style={{
+                                    paddingBottom:
+                                        "calc(env(safe-area-inset-bottom, 0px) + 12px)"
+                                }}
+                            >
+                                <div className="flex items-center gap-2 text-xs text-[#91918e]">
+                                    {isSaving ? (
+                                        <>
+                                            <motion.div
+                                                animate={{
+                                                    opacity: [0.4, 1, 0.4]
+                                                }}
+                                                transition={{
+                                                    repeat: Infinity,
+                                                    duration: 1.2,
+                                                    ease: "easeInOut"
+                                                }}
+                                                className="w-2 h-2 bg-[#91918e] rounded-full"
+                                            />
+                                            <span>Saving...</span>
+                                        </>
+                                    ) : lastSaved ? (
+                                        <>
+                                            <div className="w-2 h-2 bg-[#2ecc71] rounded-full" />
+                                            <span>
+                                                Saved {formatLastSaved()}
+                                            </span>
+                                        </>
+                                    ) : null}
+                                </div>
+                            </div>
+                        </motion.aside>
+                    </>
+                )}
+            </AnimatePresence>
+        );
+    }
+
+    // Desktop: Original inline sidebar
     return (
         <motion.aside
             initial={false}

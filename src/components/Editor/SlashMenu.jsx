@@ -8,9 +8,10 @@ import {
     Minus,
     Image,
     Link,
-    Video,
-    Folder,
-    Indent
+    SeparatorHorizontal,
+    Images,
+    Columns2,
+    PanelTop
 } from "lucide-react";
 import { BLOCK_TYPES } from "../../constants/BLOCK_TYPES";
 import { cn } from "../../utils/cn";
@@ -50,45 +51,46 @@ const MENU_ITEMS = [
         type: BLOCK_TYPES.CODE
     },
     {
+        id: "section",
+        label: "Section",
+        icon: SeparatorHorizontal,
+        type: BLOCK_TYPES.SECTION
+    },
+    {
+        id: "gallery",
+        label: "Gallery",
+        icon: Images,
+        type: BLOCK_TYPES.GALLERY
+    },
+    {
+        id: "columns",
+        label: "2 Columns",
+        icon: Columns2,
+        type: BLOCK_TYPES.COLUMNS
+    },
+    {
+        id: "tabs",
+        label: "Tabs",
+        icon: PanelTop,
+        type: BLOCK_TYPES.TABS
+    },
+    {
+        id: "divider",
+        label: "Divider",
+        icon: Minus,
+        type: BLOCK_TYPES.DIVIDER
+    },
+    {
         id: "image",
         label: "Image",
         icon: Image,
-        type: BLOCK_TYPES.IMAGE,
-        disabled: true
+        type: BLOCK_TYPES.IMAGE
     },
     {
         id: "link",
         label: "Link",
         icon: Link,
-        type: BLOCK_TYPES.LINK,
-        disabled: true
-    },
-    {
-        id: "video",
-        label: "Video",
-        icon: Video,
-        type: null, // Future
-        disabled: true
-    },
-    {
-        id: "group",
-        label: "Group",
-        icon: Folder,
-        type: null, // Future
-        disabled: true
-    },
-    {
-        id: "tab",
-        label: "Tab",
-        icon: Indent,
-        type: null, // Future
-        disabled: true
-    },
-    {
-        id: "divider",
-        label: "Horizontal",
-        icon: Minus,
-        type: BLOCK_TYPES.DIVIDER
+        type: BLOCK_TYPES.LINK
     }
 ];
 

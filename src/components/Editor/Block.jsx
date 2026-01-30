@@ -5,6 +5,12 @@ import { TaskBlock } from "./blocks/TaskBlock";
 import { QuoteBlock } from "./blocks/QuoteBlock";
 import { DividerBlock } from "./blocks/DividerBlock";
 import { CodeBlock } from "./blocks/CodeBlock";
+import { SectionBlock } from "./blocks/SectionBlock";
+import { GalleryBlock } from "./blocks/GalleryBlock";
+import { ColumnsBlock } from "./blocks/ColumnsBlock";
+import { TabsBlock } from "./blocks/TabsBlock";
+import { ImageBlock } from "./blocks/ImageBlock";
+import { LinkBlock } from "./blocks/LinkBlock";
 import { cn } from "../../utils/cn";
 
 /**
@@ -66,13 +72,84 @@ export function Block({
             case BLOCK_TYPES.CODE:
                 return <CodeBlock {...commonProps} />;
 
-            // TODO: Add more block types
+            case BLOCK_TYPES.SECTION:
+                return (
+                    <SectionBlock
+                        block={block}
+                        isActive={isActive}
+                        onFocus={onFocus}
+                        onKeyDown={onKeyDown}
+                        onUpdate={(updatedBlock) => {
+                            onPropertiesChange?.(updatedBlock.properties);
+                        }}
+                    />
+                );
+
+            case BLOCK_TYPES.GALLERY:
+                return (
+                    <GalleryBlock
+                        block={block}
+                        isActive={isActive}
+                        onFocus={onFocus}
+                        onKeyDown={onKeyDown}
+                        onUpdate={(updatedBlock) => {
+                            onPropertiesChange?.(updatedBlock.properties);
+                        }}
+                    />
+                );
+
+            case BLOCK_TYPES.COLUMNS:
+                return (
+                    <ColumnsBlock
+                        block={block}
+                        isActive={isActive}
+                        onFocus={onFocus}
+                        onKeyDown={onKeyDown}
+                        onUpdate={(updatedBlock) => {
+                            onPropertiesChange?.(updatedBlock.properties);
+                        }}
+                    />
+                );
+
+            case BLOCK_TYPES.TABS:
+                return (
+                    <TabsBlock
+                        block={block}
+                        isActive={isActive}
+                        onFocus={onFocus}
+                        onKeyDown={onKeyDown}
+                        onUpdate={(updatedBlock) => {
+                            onPropertiesChange?.(updatedBlock.properties);
+                        }}
+                    />
+                );
+
             case BLOCK_TYPES.IMAGE:
+                return (
+                    <ImageBlock
+                        block={block}
+                        isActive={isActive}
+                        onFocus={onFocus}
+                        onKeyDown={onKeyDown}
+                        onUpdate={(updatedBlock) => {
+                            onContentChange?.(id, updatedBlock.content);
+                            onPropertiesChange?.(id, updatedBlock.properties);
+                        }}
+                    />
+                );
+
             case BLOCK_TYPES.LINK:
                 return (
-                    <div className="p-2 bg-gray-100 rounded text-sm text-gray-500">
-                        {type} block (coming soon)
-                    </div>
+                    <LinkBlock
+                        block={block}
+                        isActive={isActive}
+                        onFocus={onFocus}
+                        onKeyDown={onKeyDown}
+                        onUpdate={(updatedBlock) => {
+                            onContentChange?.(id, updatedBlock.content);
+                            onPropertiesChange?.(id, updatedBlock.properties);
+                        }}
+                    />
                 );
 
             default:

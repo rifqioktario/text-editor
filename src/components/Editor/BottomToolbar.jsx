@@ -7,11 +7,12 @@ import {
     Italic,
     Strikethrough,
     Link,
-    Pencil,
-    MoreHorizontal
+    Pencil
 } from "lucide-react";
 import { cn } from "../../utils/cn";
 import { BLOCK_TYPES } from "../../constants/BLOCK_TYPES";
+import { ToolbarMoreMenu } from "./ToolbarMoreMenu";
+import { useMobile } from "../../hooks/useMobile";
 
 /**
  * Block type options for the dropdown
@@ -78,14 +79,23 @@ function ToolbarDivider() {
  * BottomToolbar - Fixed bottom center formatting toolbar
  */
 export function BottomToolbar({
+    sidebarCollapsed = false,
+    activeBlockId = null,
     activeBlockType = BLOCK_TYPES.PARAGRAPH,
     hasSelection = false,
     formatting = {},
     onBlockTypeChange,
     onFormatToggle,
-    onLinkInsert
+    onLinkInsert,
+    onDuplicateBlock,
+    onDeleteBlock,
+    onInsertDivider
 }) {
     const [isBlockTypeOpen, setIsBlockTypeOpen] = useState(false);
+    const { isMobile } = useMobile();
+
+    // Calculate sidebar width for dynamic centering (only on desktop)
+    const sidebarWidth = isMobile ? 0 : sidebarCollapsed ? 0 : 240;
 
     // Close dropdown on escape
     useEffect(() => {
@@ -137,128 +147,185 @@ export function BottomToolbar({
     return (
         <div
             className={cn(
-                "fixed bottom-6 left-1/2 -translate-x-1/2",
-                "z-50",
-                "flex items-center gap-1",
-                "px-2 py-1.5",
-                "bg-white/90 backdrop-blur-xl",
-                "border border-gray-200/50",
-                "rounded-full",
-                "shadow-lg shadow-black/5"
+                "fixed z-50",
+                // Mobile: full-width scrollable
+                isMobile
+                    ? [
+                          "left-0 right-0 bottom-0",
+                          "px-2",
+                          "bg-white/95 backdrop-blur-xl",
+                          "border-t border-gray-200/50"
+                      ]
+                    : [
+                          "bottom-6",
+                          "flex items-center gap-1",
+                          "px-2 py-1.5",
+                          "bg-white/90 backdrop-blur-xl",
+                          "border border-gray-200/50",
+                          "rounded-full",
+                          "shadow-lg shadow-black/5"
+                      ]
             )}
+            style={
+                isMobile
+                    ? {
+                          paddingBottom:
+                              "calc(env(safe-area-inset-bottom, 0px) + 8px)",
+                          paddingTop: "8px"
+                      }
+                    : {
+                          left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
+                          transform: "translateX(-50%)",
+                          transition: "left 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                      }
+            }
         >
-            {/* Block Type Selector */}
-            <div className="relative" data-block-type-dropdown>
-                <button
-                    onClick={() => setIsBlockTypeOpen(!isBlockTypeOpen)}
-                    className={cn(
-                        "flex items-center gap-1.5 px-2 py-1.5 rounded-lg",
-                        "transition-all duration-150",
-                        "hover:bg-gray-100 active:bg-gray-200",
-                        isBlockTypeOpen && "bg-gray-100"
-                    )}
-                >
-                    <LayoutPanelLeft className="w-[18px] h-[18px] text-gray-600" />
-                    <span className="text-sm text-gray-700 font-medium">
-                        {getBlockTypeLabel(activeBlockType)}
-                    </span>
-                    <ChevronDown
+            {/* Scrollable container for mobile */}
+            <div
+                className={cn(
+                    "flex items-center",
+                    isMobile
+                        ? [
+                              "overflow-x-auto scrollbar-hide",
+                              "gap-1 py-1",
+                              "-mx-2 px-2",
+                              "snap-x snap-mandatory"
+                          ]
+                        : "gap-1"
+                )}
+            >
+                {/* Block Type Selector */}
+                <div className="relative" data-block-type-dropdown>
+                    <button
+                        onClick={() => setIsBlockTypeOpen(!isBlockTypeOpen)}
                         className={cn(
-                            "w-4 h-4 text-gray-500 transition-transform",
-                            isBlockTypeOpen && "rotate-180"
-                        )}
-                    />
-                </button>
-
-                {/* Block Type Dropdown */}
-                {isBlockTypeOpen && (
-                    <div
-                        className={cn(
-                            "absolute bottom-full left-0 mb-2",
-                            "w-40 py-1",
-                            "bg-white/90 backdrop-blur-xl",
-                            "border border-gray-200/50 rounded-xl",
-                            "shadow-lg"
+                            "flex items-center gap-1.5 px-2 py-1.5 rounded-lg",
+                            "transition-all duration-150",
+                            "hover:bg-gray-100 active:bg-gray-200",
+                            isBlockTypeOpen && "bg-gray-100"
                         )}
                     >
-                        {BLOCK_TYPE_OPTIONS.map((option) => (
-                            <button
-                                key={option.id}
-                                onClick={() =>
-                                    handleBlockTypeSelect(option.type)
-                                }
-                                className={cn(
-                                    "w-full px-3 py-2 text-left text-sm",
-                                    "transition-colors",
-                                    "hover:bg-gray-100",
-                                    activeBlockType === option.type &&
-                                        "bg-gray-100 text-gray-900 font-medium"
-                                )}
-                            >
-                                {option.label}
-                            </button>
-                        ))}
-                    </div>
-                )}
+                        <LayoutPanelLeft className="w-[18px] h-[18px] text-gray-600" />
+                        <span className="text-sm text-gray-700 font-medium">
+                            {getBlockTypeLabel(activeBlockType)}
+                        </span>
+                        <ChevronDown
+                            className={cn(
+                                "w-4 h-4 text-gray-500 transition-transform",
+                                isBlockTypeOpen && "rotate-180"
+                            )}
+                        />
+                    </button>
+
+                    {/* Block Type Dropdown */}
+                    {isBlockTypeOpen && (
+                        <div
+                            className={cn(
+                                "absolute bottom-full left-0 mb-2",
+                                "w-40 py-1",
+                                "bg-white/90 backdrop-blur-xl",
+                                "border border-gray-200/50 rounded-xl",
+                                "shadow-lg"
+                            )}
+                        >
+                            {BLOCK_TYPE_OPTIONS.map((option) => (
+                                <button
+                                    key={option.id}
+                                    onClick={() =>
+                                        handleBlockTypeSelect(option.type)
+                                    }
+                                    className={cn(
+                                        "w-full px-3 py-2 text-left text-sm",
+                                        "transition-colors",
+                                        "hover:bg-gray-100",
+                                        activeBlockType === option.type &&
+                                            "bg-gray-100 text-gray-900 font-medium"
+                                    )}
+                                >
+                                    {option.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <ToolbarDivider />
+
+                {/* Formatting Buttons */}
+                <ToolbarButton
+                    icon={Bold}
+                    onClick={() => handleFormat("bold")}
+                    isActive={formatting.bold}
+                    disabled={!hasSelection}
+                    title="Bold"
+                />
+                <ToolbarButton
+                    icon={Underline}
+                    onClick={() => handleFormat("underline")}
+                    isActive={formatting.underline}
+                    disabled={!hasSelection}
+                    title="Underline"
+                />
+                <ToolbarButton
+                    icon={Italic}
+                    onClick={() => handleFormat("italic")}
+                    isActive={formatting.italic}
+                    disabled={!hasSelection}
+                    title="Italic"
+                />
+                <ToolbarButton
+                    icon={Strikethrough}
+                    onClick={() => handleFormat("strikethrough")}
+                    isActive={formatting.strikethrough}
+                    disabled={!hasSelection}
+                    title="Strikethrough"
+                />
+
+                <ToolbarDivider />
+
+                {/* Link & Highlight */}
+                <ToolbarButton
+                    icon={Link}
+                    onClick={() => onLinkInsert?.()}
+                    disabled={!hasSelection}
+                    title="Insert Link"
+                />
+                <ToolbarButton
+                    icon={Pencil}
+                    onClick={() => handleFormat("highlight")}
+                    isActive={formatting.highlight}
+                    disabled={!hasSelection}
+                    title="Highlight"
+                />
+
+                <ToolbarDivider />
+
+                {/* More Options */}
+                <ToolbarMoreMenu
+                    hasSelection={hasSelection}
+                    activeBlockId={activeBlockId}
+                    onTextColor={(color) => {
+                        if (color) {
+                            document.execCommand("foreColor", false, color);
+                        } else {
+                            document.execCommand("removeFormat", false, null);
+                        }
+                    }}
+                    onBackgroundColor={(color) => {
+                        if (color) {
+                            document.execCommand("backColor", false, color);
+                        } else {
+                            document.execCommand("removeFormat", false, null);
+                        }
+                    }}
+                    onAlign={(alignment) =>
+                        document.execCommand(`justify${alignment}`, false, null)
+                    }
+                    onDuplicateBlock={onDuplicateBlock}
+                    onDeleteBlock={onDeleteBlock}
+                    onInsertDivider={onInsertDivider}
+                />
             </div>
-
-            <ToolbarDivider />
-
-            {/* Formatting Buttons */}
-            <ToolbarButton
-                icon={Bold}
-                onClick={() => handleFormat("bold")}
-                isActive={formatting.bold}
-                disabled={!hasSelection}
-                title="Bold"
-            />
-            <ToolbarButton
-                icon={Underline}
-                onClick={() => handleFormat("underline")}
-                isActive={formatting.underline}
-                disabled={!hasSelection}
-                title="Underline"
-            />
-            <ToolbarButton
-                icon={Italic}
-                onClick={() => handleFormat("italic")}
-                isActive={formatting.italic}
-                disabled={!hasSelection}
-                title="Italic"
-            />
-            <ToolbarButton
-                icon={Strikethrough}
-                onClick={() => handleFormat("strikethrough")}
-                isActive={formatting.strikethrough}
-                disabled={!hasSelection}
-                title="Strikethrough"
-            />
-
-            <ToolbarDivider />
-
-            {/* Link & Highlight */}
-            <ToolbarButton
-                icon={Link}
-                onClick={() => onLinkInsert?.()}
-                disabled={!hasSelection}
-                title="Insert Link"
-            />
-            <ToolbarButton
-                icon={Pencil}
-                onClick={() => handleFormat("highlight")}
-                isActive={formatting.highlight}
-                disabled={!hasSelection}
-                title="Highlight"
-            />
-
-            <ToolbarDivider />
-
-            {/* More Options */}
-            <ToolbarButton
-                icon={MoreHorizontal}
-                onClick={() => {}}
-                title="More options"
-            />
         </div>
     );
 }

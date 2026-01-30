@@ -1,15 +1,25 @@
 import { useCallback } from "react";
 import { useEditorStore } from "../../stores/editorStore";
+import { useDocumentsStore } from "../../stores/documentsStore";
 import { EditorCanvas } from "./EditorCanvas";
 import { BottomToolbar } from "./BottomToolbar";
 import { useTextSelection } from "../../hooks/useTextSelection";
 import { cn } from "../../utils/cn";
+import { BLOCK_TYPES } from "../../constants/BLOCK_TYPES";
 
 /**
  * Editor - Main editor container
  */
 export function Editor() {
-    const { activeBlockId, getBlockById, convertBlockType } = useEditorStore();
+    const {
+        activeBlockId,
+        getBlockById,
+        convertBlockType,
+        duplicateBlock,
+        deleteBlock,
+        addBlockAfter
+    } = useEditorStore();
+    const { sidebarCollapsed } = useDocumentsStore();
 
     // Track text selection
     const selection = useTextSelection();
@@ -93,6 +103,31 @@ export function Editor() {
         }
     };
 
+    // Handle duplicate block
+    const handleDuplicateBlock = useCallback(() => {
+        if (activeBlockId) {
+            duplicateBlock(activeBlockId);
+        }
+    }, [activeBlockId, duplicateBlock]);
+
+    // Handle delete block
+    const handleDeleteBlock = useCallback(() => {
+        if (activeBlockId) {
+            deleteBlock(activeBlockId);
+        }
+    }, [activeBlockId, deleteBlock]);
+
+    // Handle insert divider
+    const handleInsertDivider = useCallback(() => {
+        if (activeBlockId) {
+            addBlockAfter(activeBlockId, {
+                type: BLOCK_TYPES.DIVIDER,
+                content: "",
+                properties: {}
+            });
+        }
+    }, [activeBlockId, addBlockAfter]);
+
     return (
         <div
             className={cn(
@@ -107,12 +142,17 @@ export function Editor() {
 
             {/* Bottom Toolbar */}
             <BottomToolbar
+                sidebarCollapsed={sidebarCollapsed}
+                activeBlockId={activeBlockId}
                 activeBlockType={activeBlockType}
                 hasSelection={selection.hasSelection}
                 formatting={{}}
                 onBlockTypeChange={handleBlockTypeChange}
                 onFormatToggle={handleFormatToggle}
                 onLinkInsert={handleLinkInsert}
+                onDuplicateBlock={handleDuplicateBlock}
+                onDeleteBlock={handleDeleteBlock}
+                onInsertDivider={handleInsertDivider}
             />
         </div>
     );

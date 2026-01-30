@@ -12,7 +12,12 @@ export const BLOCK_TYPES = {
     CODE: "code",
     IMAGE: "image",
     DIVIDER: "divider",
-    LINK: "link"
+    LINK: "link",
+    // Advanced block types
+    SECTION: "section",
+    GALLERY: "gallery",
+    COLUMNS: "columns",
+    TABS: "tabs"
 };
 
 /**
@@ -78,6 +83,30 @@ export const BLOCK_TYPE_INFO = {
         description: "Web link",
         icon: "Link",
         shortcut: null
+    },
+    [BLOCK_TYPES.SECTION]: {
+        label: "Section",
+        description: "Section divider with title",
+        icon: "SeparatorHorizontal",
+        shortcut: "---"
+    },
+    [BLOCK_TYPES.GALLERY]: {
+        label: "Gallery",
+        description: "Image gallery carousel",
+        icon: "Images",
+        shortcut: null
+    },
+    [BLOCK_TYPES.COLUMNS]: {
+        label: "Columns",
+        description: "Multi-column layout",
+        icon: "Columns2",
+        shortcut: null
+    },
+    [BLOCK_TYPES.TABS]: {
+        label: "Tabs",
+        description: "Tabbed content sections",
+        icon: "PanelTop",
+        shortcut: null
     }
 };
 
@@ -94,5 +123,25 @@ export const DEFAULT_BLOCK_PROPERTIES = {
     [BLOCK_TYPES.CODE]: { language: "javascript" },
     [BLOCK_TYPES.IMAGE]: { url: "", alt: "", caption: "" },
     [BLOCK_TYPES.DIVIDER]: {},
-    [BLOCK_TYPES.LINK]: { url: "", title: "" }
+    [BLOCK_TYPES.LINK]: { url: "", title: "" },
+    [BLOCK_TYPES.SECTION]: { title: "" },
+    [BLOCK_TYPES.GALLERY]: { images: [], aspectRatio: "portrait" },
+    [BLOCK_TYPES.COLUMNS]: { count: 2, widths: [50, 50], gap: 16 },
+    [BLOCK_TYPES.TABS]: { tabs: [], activeTabId: null }
 };
+
+/**
+ * Factory function to create block properties with generated IDs
+ * Call this when creating new blocks of these types
+ */
+export function createBlockProperties(type) {
+    const defaultProps = { ...DEFAULT_BLOCK_PROPERTIES[type] };
+
+    if (type === BLOCK_TYPES.TABS) {
+        const tabId = crypto.randomUUID();
+        defaultProps.tabs = [{ id: tabId, label: "Tab 1" }];
+        defaultProps.activeTabId = tabId;
+    }
+
+    return defaultProps;
+}

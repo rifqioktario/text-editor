@@ -49,7 +49,10 @@ export function EditorCanvas() {
         deleteSelectedBlocks
     } = useEditorStore();
 
-    const blocks = document.blocks;
+    // Filter out nested blocks (blocks inside columns/tabs) from main canvas
+    const blocks = document.blocks.filter(
+        (b) => b.columnIndex === undefined && b.parentTabId === undefined
+    );
 
     // Slash menu state
     const [slashMenu, setSlashMenu] = useState({
@@ -89,10 +92,28 @@ export function EditorCanvas() {
             if (modKey && e.key === "a" && isInEditor) {
                 const selection = window.getSelection();
                 const hasTextSelection = selection && !selection.isCollapsed;
+                const targetTextContent = e.target.textContent || "";
                 const isAllTextSelected =
                     hasTextSelection &&
                     selection.toString().length >=
-                        (e.target.textContent?.length || 0);
+                        (targetTextContent.length || 0);
+
+                // Check if we're in a container block (Tabs, Columns, Gallery, Section)
+                // These should skip text selection and go straight to block selection
+                const isContainerBlock =
+                    e.target.closest('[data-block-type="TABS"]') ||
+                    e.target.closest('[data-block-type="COLUMNS"]') ||
+                    e.target.closest('[data-block-type="GALLERY"]') ||
+                    e.target.closest('[data-block-type="SECTION"]') ||
+                    e.target.closest('[data-block-type="DIVIDER"]');
+
+                // For container blocks OR blocks with no text content, skip straight to block selection
+                const isNoTextBlock = targetTextContent.trim().length === 0;
+                if (isNoTextBlock || isContainerBlock) {
+                    e.preventDefault();
+                    cycleSelection();
+                    return;
+                }
 
                 // If no selection or partial selection, let browser handle it (select all text in block)
                 if (!hasTextSelection || !isAllTextSelected) {
@@ -457,13 +478,57 @@ export function EditorCanvas() {
                 splitBlock(blockId, offset);
             }
 
-            // Backspace at start - Merge with previous
+            // Backspace at start - Merge with previous or delete container block
             if (e.key === "Backspace") {
                 const isCollapsed = selection?.isCollapsed !== false;
                 const blockIndex = blocks.findIndex((b) => b.id === blockId);
                 const block = blocks[blockIndex];
 
-                // Get actual DOM content - check for textarea (CodeBlock) or contentEditable
+                // Container block types that don't have editable content
+                const containerTypes = [
+                    BLOCK_TYPES.TABS,
+                    BLOCK_TYPES.COLUMNS,
+                    BLOCK_TYPES.GALLERY,
+                    BLOCK_TYPES.SECTION,
+                    BLOCK_TYPES.DIVIDER
+                ];
+                const isContainerBlock = containerTypes.includes(block?.type);
+
+                // For container blocks, check if they're truly empty
+                if (isContainerBlock) {
+                    const hasNestedContent =
+                        (block?.children &&
+                            Object.keys(block.children).length > 0) ||
+                        block?.properties?.images?.length > 0 ||
+                        block?.properties?.tabs?.some(
+                            (t) => block.children?.[t.id]?.length > 0
+                        );
+
+                    // Allow deletion if:
+                    // - Block is truly empty (no nested content)
+                    // - OR it's a simple divider/section
+                    // - AND there's more than one block OR this isn't the only block
+                    if (
+                        !hasNestedContent ||
+                        block?.type === BLOCK_TYPES.DIVIDER ||
+                        block?.type === BLOCK_TYPES.SECTION
+                    ) {
+                        e.preventDefault();
+                        if (blockIndex > 0) {
+                            mergeWithPreviousBlock(blockId);
+                        } else if (blocks.length > 1) {
+                            // First block - just delete it and focus next
+                            deleteSelectedBlocks();
+                            const nextBlock = blocks[1];
+                            if (nextBlock) {
+                                setActiveBlock(nextBlock.id);
+                            }
+                        }
+                        return;
+                    }
+                }
+
+                // Get actual DOM content for regular blocks
                 const target = e.currentTarget;
                 let domContent = "";
                 let cursorAtStart = false;
@@ -482,12 +547,9 @@ export function EditorCanvas() {
 
                 const isBlockEmpty = domContent.length === 0;
 
-                // For Divider blocks, always allow deletion
-                const isDivider = block?.type === "divider";
-
-                // Merge if at start (or block is empty/divider) with no selection
+                // Merge if at start (or block is empty) with no selection
                 if (
-                    (cursorAtStart || isBlockEmpty || isDivider) &&
+                    (cursorAtStart || isBlockEmpty) &&
                     isCollapsed &&
                     blockIndex > 0
                 ) {
@@ -575,7 +637,8 @@ export function EditorCanvas() {
             setActiveBlock,
             slashMenu.isOpen,
             indentBlock,
-            outdentBlock
+            outdentBlock,
+            deleteSelectedBlocks
         ]
     );
 
